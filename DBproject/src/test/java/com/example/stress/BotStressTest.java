@@ -41,7 +41,6 @@ public class BotStressTest {
         long startTime = System.currentTimeMillis();
 
         // 1. Create a "Testable" Bot that doesn't hit the internet
-        // This relies on the changes you made to MyTelegramBot.java in the previous step
         TestableTelegramBot bot = new TestableTelegramBot(
                 "test_token", "test_bot", userDataRepository, userTaskRepository
         );
@@ -127,8 +126,7 @@ public class BotStressTest {
     }
 
     /**
-     * Inner class that extends your bot.
-     * Overrides the PROTECTED wrapper methods you added to MyTelegramBot.java
+     * Inner class that extends bot.
      */
     static class TestableTelegramBot extends MyTelegramBot {
 
