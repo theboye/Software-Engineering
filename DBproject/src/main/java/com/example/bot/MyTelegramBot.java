@@ -50,6 +50,24 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         System.out.println("=== БОТ ИНИЦИАЛИЗИРОВАН ===");
     }
 
+    // === NEW WRAPPER METHODS FOR TESTING ===
+    protected void executeMessage(SendMessage message) {
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void executeDocument(SendDocument document) {
+        try {
+            execute(document);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+    // =======================================
+
     @Override
     public String getBotUsername() { return botName; }
 
@@ -77,7 +95,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleMessage(Long chatId, Long userId, String text, UserSession session) {
-        // Returm button handler no matter the situation
         if ("↩️ Назад в меню".equals(text) || "Отмена".equals(text)) {
             session.setState(UserState.IDLE);
             session.setSelectedTask(null);
@@ -150,7 +167,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 break;
             case "➕ Добавить дело":
                 session.setState(UserState.WAITING_NEW_TASK_NAME);
-                // Отправляем сообщение с кнопкой отмены
                 SendMessage message = new SendMessage();
                 message.setChatId(chatId.toString());
                 message.setText("📝 Введите название нового дела:");
@@ -166,17 +182,13 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 keyboard.setKeyboard(rows);
                 message.setReplyMarkup(keyboard);
 
-                try {
-                    execute(message);
-                } catch (TelegramApiException e) {
-                    e.printStackTrace();
-                }
+                executeMessage(message); // CHANGED
                 break;
             case "🗑️ Удалить дело":
                 showTasksForDeletion(chatId, userId, session);
                 break;
             case "↩️ Назад в меню":
-                session.setSelectedReportType(null);  // СБРАСЫВАЕМ ПРИ ВОЗВРАТЕ
+                session.setSelectedReportType(null);
                 sendMainMenu(chatId, "Главное меню:");
                 break;
             case "📊 Отчеты":
@@ -204,7 +216,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 if (session.getSelectedReportType() != null) {
                     String reportType = session.getSelectedReportType();
                     generateReport(chatId, userId, reportType, "STATISTICS", null, null);
-                    // Fix error with selectedReportType
                     sendReportTypeMenu(chatId, getPeriodDescription(reportType));
                 } else {
                     sendMessage(chatId, "❌ Сначала выберите период отчета");
@@ -214,14 +225,13 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 if (session.getSelectedReportType() != null) {
                     String reportType = session.getSelectedReportType();
                     generateReport(chatId, userId, reportType, "DETAILED", null, null);
-                    // Same error
                     sendReportTypeMenu(chatId, getPeriodDescription(reportType));
                 } else {
                     sendMessage(chatId, "❌ Сначала выберите период отчета");
                 }
                 break;
             case "↩️ Назад к отчетам":
-                session.setSelectedReportType(null);  // Once activated, drop
+                session.setSelectedReportType(null);
                 sendReportsMenu(chatId);
                 break;
             case "📈 Статистика недели":
@@ -229,8 +239,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 break;
             default:
                 sendMainMenu(chatId, "Выберите действие из меню:");
-
-
         }
     }
 
@@ -250,10 +258,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        StringBuilder message = new StringBuilder("📋 Выберите задачу (введите номер):\n\n");
+        StringBuilder messageText = new StringBuilder("📋 Выберите задачу (введите номер):\n\n");
         int index = 1;
         for (UserTask task : tasks) {
-            message.append(index).append(". ").append(task.getTaskName())
+            messageText.append(index).append(". ").append(task.getTaskName())
                     .append(" (использовано: ").append(task.getUsageCount()).append(")\n");
             index++;
         }
@@ -261,10 +269,9 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         session.setState(UserState.WAITING_TASK_SELECTION);
         session.setTaskList(tasks);
 
-        // Send with Cancel button
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId.toString());
-        sendMessage.setText(message.toString());
+        sendMessage.setText(messageText.toString());
 
         ReplyKeyboardMarkup keyboard = new ReplyKeyboardMarkup();
         keyboard.setResizeKeyboard(true);
@@ -277,15 +284,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setKeyboard(rows);
         sendMessage.setReplyMarkup(keyboard);
 
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(sendMessage); // CHANGED
     }
 
     private void handleTaskSelection(Long chatId, Long userId, String text, UserSession session) {
-        // Handle Cancel button
         if ("Отмена".equals(text)) {
             session.setState(UserState.IDLE);
             sendMainMenu(chatId, "Возвращаюсь в главное меню");
@@ -336,7 +338,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         LocalDateTime endTime = LocalDateTime.now();
         long duration = ChronoUnit.MINUTES.between(session.getTimerStart(), endTime);
 
-        // Saving to DB
         UserData userData = new UserData();
         userData.setUserId(userId);
         userData.setTaskName(session.getSelectedTask());
@@ -345,7 +346,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         userData.setDurationMinutes(duration);
         userDataRepository.save(userData);
 
-        //fixed bug
         if (session.getCurrentTaskId() != null) {
             Optional<UserTask> taskOpt = userTaskRepository.findById(session.getCurrentTaskId());
             if (taskOpt.isPresent()) {
@@ -415,15 +415,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setKeyboard(rows);
         sendMessage.setReplyMarkup(keyboard);
 
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(sendMessage); // CHANGED
     }
 
     private void handleNewTaskName(Long chatId, Long userId, String text, UserSession session) {
-        // Handle Cancel button
         if ("Отмена".equals(text)) {
             session.setState(UserState.IDLE);
             showTaskManagement(chatId, userId);
@@ -435,7 +430,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Check tasks limit
         List<UserTask> userTasks = userTaskRepository.findByUserIdOrderByUsageCountDesc(userId);
         if (userTasks.size() >= MAX_TASKS_PER_USER) {
             sendMessage(chatId, "❌ Достигнут лимит задач (" + MAX_TASKS_PER_USER + "). Удалите некоторые дела чтобы добавить новые.");
@@ -443,7 +437,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Check if same task exists
         Optional<UserTask> existingTask = userTaskRepository.findByUserIdAndTaskName(userId, text);
         if (existingTask.isPresent()) {
             sendMessage(chatId, "❌ Задача с таким названием уже существует!");
@@ -451,7 +444,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        // New task
         UserTask newTask = new UserTask();
         newTask.setUserId(userId);
         newTask.setTaskName(text);
@@ -482,7 +474,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         session.setState(UserState.WAITING_TASK_DELETION);
         session.setTaskList(tasks);
 
-        // Message with cancel button
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId.toString());
         sendMessage.setText(message.toString());
@@ -498,15 +489,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setKeyboard(rows);
         sendMessage.setReplyMarkup(keyboard);
 
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(sendMessage); // CHANGED
     }
 
     private void handleTaskDeletion(Long chatId, Long userId, String text, UserSession session) {
-        // Handle Cancel button
         if ("Отмена".equals(text)) {
             session.setState(UserState.IDLE);
             showTaskManagement(chatId, userId);
@@ -545,7 +531,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         }
 
         try {
-            // Temporary file for sending data
             File file = File.createTempFile("timemanager_export_" + userId + "_", ".txt");
             FileWriter writer = new FileWriter(file);
 
@@ -566,24 +551,21 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
             writer.close();
 
-            // File sending
             SendDocument document = new SendDocument();
             document.setChatId(chatId.toString());
             document.setDocument(new InputFile(file, "timemanager_export.txt"));
             document.setCaption("📁 Ваши данные экспортированы в файл");
 
-            execute(document);
+            executeDocument(document); // CHANGED
 
-            // Cleaning
             file.delete();
 
-        } catch (IOException | TelegramApiException e) {
+        } catch (IOException e) {
             sendMessage(chatId, "❌ Ошибка при экспорте данных: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    // Keyboard's methods
     private void sendMainMenu(Long chatId, String text) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
@@ -592,11 +574,7 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         ReplyKeyboardMarkup keyboard = createMainMenuKeyboard();
         message.setReplyMarkup(keyboard);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private ReplyKeyboardMarkup createMainMenuKeyboard() {
@@ -610,10 +588,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         KeyboardRow row2 = new KeyboardRow();
         row2.add("📋 Мои дела");
-        row2.add("📊 Отчеты");  // заменили "Отчет за неделю"
+        row2.add("📊 Отчеты");
 
         KeyboardRow row3 = new KeyboardRow();
-        row3.add("📈 Статистика недели");  // новая кнопка
+        row3.add("📈 Статистика недели");
         row3.add("📁 Выгрузить данные");
 
         KeyboardRow row4 = new KeyboardRow();
@@ -622,6 +600,7 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         rows.add(row1);
         rows.add(row2);
         rows.add(row3);
+        rows.add(row4);
 
         keyboard.setKeyboard(rows);
         return keyboard;
@@ -636,24 +615,17 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setResizeKeyboard(true);
 
         List<KeyboardRow> rows = new ArrayList<>();
-
         KeyboardRow row1 = new KeyboardRow();
         row1.add("▶️ Начать таймер");
-
         KeyboardRow row2 = new KeyboardRow();
         row2.add("↩️ Назад в меню");
 
         rows.add(row1);
         rows.add(row2);
-
         keyboard.setKeyboard(rows);
         message.setReplyMarkup(keyboard);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void sendTimerRunningMenu(Long chatId, String text) {
@@ -665,31 +637,21 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setResizeKeyboard(true);
 
         List<KeyboardRow> rows = new ArrayList<>();
-
         KeyboardRow row1 = new KeyboardRow();
         row1.add("⏹️ Остановить таймер");
 
         rows.add(row1);
-
         keyboard.setKeyboard(rows);
         message.setReplyMarkup(keyboard);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void sendMessage(Long chatId, String text) {
-        try {
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId.toString());
-            message.setText(text);
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(text);
+        executeMessage(message); // CHANGED
     }
 
     private void sendReportsMenu(Long chatId) {
@@ -701,7 +663,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setResizeKeyboard(true);
 
         List<KeyboardRow> rows = new ArrayList<>();
-
         KeyboardRow row1 = new KeyboardRow();
         row1.add("📅 Отчет за неделю");
         row1.add("📅 Отчет за месяц");
@@ -716,15 +677,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         rows.add(row1);
         rows.add(row2);
         rows.add(row3);
-
         keyboard.setKeyboard(rows);
         message.setReplyMarkup(keyboard);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void sendReportTypeMenu(Long chatId, String periodType) {
@@ -736,7 +692,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         keyboard.setResizeKeyboard(true);
 
         List<KeyboardRow> rows = new ArrayList<>();
-
         KeyboardRow row1 = new KeyboardRow();
         row1.add("📈 Статистика");
         row1.add("📋 Подробный");
@@ -746,15 +701,10 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         rows.add(row1);
         rows.add(row2);
-
         keyboard.setKeyboard(rows);
         message.setReplyMarkup(keyboard);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void sendInstruction(Long chatId) {
@@ -789,9 +739,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         List<KeyboardRow> rows = new ArrayList<>();
 
-        // Quick presets
-        // LocalDate today = LocalDate.now();
-
         KeyboardRow row1 = new KeyboardRow();
         row1.add("📅 Сегодня");
         row1.add("📅 Вчера");
@@ -816,39 +763,25 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         session.setState(UserState.WAITING_CUSTOM_START_DATE);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void handleCustomStartDate(Long chatId, Long userId, String text, UserSession session) {
         LocalDate startDate;
 
         switch (text) {
-            case "📅 Сегодня":
-                startDate = LocalDate.now();
-                break;
-            case "📅 Вчера":
-                startDate = LocalDate.now().minusDays(1);
-                break;
-            case "📅 Неделю назад":
-                startDate = LocalDate.now().minusWeeks(1);
-                break;
-            case "📅 Месяц назад":
-                startDate = LocalDate.now().minusMonths(1);
-                break;
+            case "📅 Сегодня": startDate = LocalDate.now(); break;
+            case "📅 Вчера": startDate = LocalDate.now().minusDays(1); break;
+            case "📅 Неделю назад": startDate = LocalDate.now().minusWeeks(1); break;
+            case "📅 Месяц назад": startDate = LocalDate.now().minusMonths(1); break;
             case "✏️ Ввести вручную":
                 sendMessage(chatId, "📅 Введите начальную дату в формате ГГГГ.ММ.ДД\nНапример: 2024.11.01");
-                // Handling WAITING_CUSTOM_START_DATE for handwritten data
                 return;
             case "↩️ Назад к отчетам":
                 sendReportsMenu(chatId);
                 session.setState(UserState.IDLE);
                 return;
             default:
-                // Text parsing
                 try {
                     startDate = LocalDate.parse(text, DateTimeFormatter.ofPattern("yyyy.MM.dd"));
                 } catch (Exception e) {
@@ -879,7 +812,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         KeyboardRow row1 = new KeyboardRow();
         row1.add("📅 Сегодня");
 
-        // Quick presets
         if (startDate.isBefore(today.minusDays(1))) {
             row1.add("📅 Завтра от начала");
         }
@@ -905,11 +837,7 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         session.setState(UserState.WAITING_CUSTOM_END_DATE);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
+        executeMessage(message); // CHANGED
     }
 
     private void handleCustomEndDate(Long chatId, Long userId, String text, UserSession session) {
@@ -917,27 +845,17 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         LocalDate endDate;
 
         switch (text) {
-            case "📅 Сегодня":
-                endDate = LocalDate.now();
-                break;
-            case "📅 Завтра от начала":
-                endDate = startDate.plusDays(1);
-                break;
-            case "📅 Неделя от начала":
-                endDate = startDate.plusWeeks(1);
-                break;
-            case "📅 Месяц от начала":
-                endDate = startDate.plusMonths(1);
-                break;
+            case "📅 Сегодня": endDate = LocalDate.now(); break;
+            case "📅 Завтра от начала": endDate = startDate.plusDays(1); break;
+            case "📅 Неделя от начала": endDate = startDate.plusWeeks(1); break;
+            case "📅 Месяц от начала": endDate = startDate.plusMonths(1); break;
             case "✏️ Ввести вручную":
                 sendMessage(chatId, "📅 Введите конечную дату в формате ГГГГ.ММ.ДД\nНапример: 2024.11.15");
-                // Handling WAITING_CUSTOM_END_DATE for hand written data
                 return;
             case "↩️ Выбрать другую начальную дату":
                 handleCustomPeriodStart(chatId, session);
                 return;
             default:
-                // Text parsing
                 try {
                     endDate = LocalDate.parse(text, DateTimeFormatter.ofPattern("yyyy.MM.dd"));
                 } catch (Exception e) {
@@ -947,13 +865,11 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 break;
         }
 
-        // End>Start check
         if (endDate.isBefore(startDate)) {
             sendMessage(chatId, "❌ Конечная дата не может быть раньше начальной!\nВыберите другую дату:");
             return;
         }
 
-        // Report generator
         generateReport(chatId, userId, "CUSTOM", "STATISTICS", startDate, endDate);
 
         session.setState(UserState.IDLE);
@@ -967,7 +883,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         LocalDateTime endDate;
         String periodDescription;
 
-        // Check/calculate report period
         switch (periodType) {
             case "WEEK":
                 endDate = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
@@ -996,7 +911,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                 return;
         }
 
-        // Getting data
         List<UserData> reportData = userDataRepository.findByUserIdAndStartTimeBetween(userId, startDate, endDate);
 
         if (reportData.isEmpty()) {
@@ -1004,7 +918,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Based on type, generating report
         if ("STATISTICS".equals(reportType)) {
             generateStatisticsReport(chatId, reportData, periodDescription, startDate, endDate);
         } else if ("DETAILED".equals(reportType)) {
@@ -1014,19 +927,16 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
     private void generateStatisticsReport(Long chatId, List<UserData> reportData, String periodDescription,
                                           LocalDateTime startDate, LocalDateTime endDate) {
-        // Grouping tasks
         Map<String, Long> taskDurations = new HashMap<>();
         long totalMinutes = 0;
 
         for (UserData data : reportData) {
             String taskName = data.getTaskName();
             long duration = data.getDurationMinutes();
-
             taskDurations.put(taskName, taskDurations.getOrDefault(taskName, 0L) + duration);
             totalMinutes += duration;
         }
 
-        // Sort by descending time
         List<Map.Entry<String, Long>> sortedTasks = new ArrayList<>(taskDurations.entrySet());
         sortedTasks.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
 
@@ -1035,7 +945,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         report.append("Период: ").append(startDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")))
                 .append(" - ").append(endDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("\n\n");
 
-        // ASCII diagram
         if (totalMinutes > 0) {
             report.append("📈 Распределение времени:\n");
             int maxBars = 10;
@@ -1073,25 +982,20 @@ public class MyTelegramBot extends TelegramLongPollingBot {
     private void generateDetailedReport(Long chatId, Long userId, List<UserData> reportData, String periodDescription,
                                         LocalDateTime startDate, LocalDateTime endDate, String periodType) {
 
-        // Detailed reports are sent as file for big time periods
         if ("MONTH".equals(periodType) || "YEAR".equals(periodType)) {
-            System.out.println("Sending as file for period: " + periodType);
             sendDetailedReportAsFile(chatId, userId, reportData, periodDescription, startDate, endDate);
             return;
         }
 
-        // As text in TG for small periods
         StringBuilder report = new StringBuilder();
         report.append("📋 Подробный отчет за ").append(periodDescription).append(":\n\n");
 
-        // Group by days
         Map<LocalDate, List<UserData>> dailyData = new TreeMap<>();
         for (UserData data : reportData) {
             LocalDate day = data.getStartTime().toLocalDate();
             dailyData.computeIfAbsent(day, k -> new ArrayList<>()).add(data);
         }
 
-        // Display by day
         for (Map.Entry<LocalDate, List<UserData>> dayEntry : dailyData.entrySet()) {
             report.append("📅 ").append(dayEntry.getKey().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append(":\n");
 
@@ -1110,11 +1014,7 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
     private void sendDetailedReportAsFile(Long chatId, Long userId, List<UserData> reportData, String periodDescription,
                                           LocalDateTime startDate, LocalDateTime endDate) {
-        System.out.println("=== DEBUG: sendDetailedReportAsFile ===");
-        System.out.println("Data size: " + reportData.size());
-
         if (reportData.isEmpty()) {
-            System.out.println("No data to generate file");
             sendMessage(chatId, "❌ Нет данных для создания детального отчета");
             return;
         }
@@ -1130,14 +1030,12 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                     endDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) + "\n");
             writer.write("=" .repeat(50) + "\n\n");
 
-            // Group...
             Map<LocalDate, List<UserData>> dailyData = new TreeMap<>();
             for (UserData data : reportData) {
                 LocalDate day = data.getStartTime().toLocalDate();
                 dailyData.computeIfAbsent(day, k -> new ArrayList<>()).add(data);
             }
 
-            // Write...
             for (Map.Entry<LocalDate, List<UserData>> dayEntry : dailyData.entrySet()) {
                 writer.write(dayEntry.getKey().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) + ":\n");
 
@@ -1152,19 +1050,16 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
             writer.close();
 
-            // Sending file
             SendDocument document = new SendDocument();
             document.setChatId(chatId.toString());
             document.setDocument(new InputFile(file, "detailed_report.txt"));
             document.setCaption("📋 Детальный отчет за " + periodDescription);
 
-            execute(document);
+            executeDocument(document); // CHANGED
 
-            // Cleaning/Debug
             file.delete();
-            System.out.println("File created successfully");
 
-        } catch (IOException | TelegramApiException e) {
+        } catch (IOException e) {
             sendMessage(chatId, "❌ Ошибка при создании отчета: " + e.getMessage());
             e.printStackTrace();
         }
@@ -1181,31 +1076,25 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Grouping by days and months
         Map<LocalDate, Map<String, Long>> dailyStats = new TreeMap<>();
-
-        // Initialize weekend days by rising order
         LocalDate today = LocalDate.now();
         LocalDate monday = today.minusDays(today.getDayOfWeek().getValue() - 1);
 
         for (int i = 0; i < 7; i++) {
-            LocalDate day = monday.plusDays(i); // От понедельника до воскресенья
+            LocalDate day = monday.plusDays(i);
             dailyStats.put(day, new HashMap<>());
         }
 
-        // Getting statistics
         for (UserData data : weeklyData) {
             LocalDate day = data.getStartTime().toLocalDate();
             String taskName = data.getTaskName();
             long duration = data.getDurationMinutes();
 
-            // Add day if in interval of current week
             if (dailyStats.containsKey(day)) {
                 dailyStats.get(day).merge(taskName, duration, Long::sum);
             }
         }
 
-        // Find top 3 for current week
         Map<String, Long> weeklyTotals = new HashMap<>();
         for (Map<String, Long> dayData : dailyStats.values()) {
             for (Map.Entry<String, Long> entry : dayData.entrySet()) {
@@ -1216,13 +1105,11 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         List<Map.Entry<String, Long>> topTasks = new ArrayList<>(weeklyTotals.entrySet());
         topTasks.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
 
-        // Taking...
         List<String> topTaskNames = new ArrayList<>();
         for (int i = 0; i < Math.min(3, topTasks.size()); i++) {
             topTaskNames.add(topTasks.get(i).getKey());
         }
 
-        // Creating diagram
         StringBuilder chart = new StringBuilder();
         chart.append("📊 Сравнение за неделю\n");
         chart.append("```\n");
@@ -1232,9 +1119,8 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             String shortName = taskName.length() > 10 ? taskName.substring(0, 10) + "..." : taskName;
             chart.append(String.format("%-12s", shortName));
 
-            // From monday to sunday
             for (int i = 0; i < 7; i++) {
-                LocalDate day = monday.plusDays(i); // fixed error with wrong current day selection
+                LocalDate day = monday.plusDays(i);
                 long minutes = dailyStats.get(day).getOrDefault(taskName, 0L);
 
                 if (minutes == 0) {
@@ -1253,10 +1139,8 @@ public class MyTelegramBot extends TelegramLongPollingBot {
         }
         chart.append("```\n\n");
 
-// Markdown v2 fixing
         chart.append("Легенда: \\- \\= 0м \\| \\. <30м \\| o \\<1ч \\| O \\<2ч \\| X \\>2ч\n\n");
 
-// Combined statistics
         long totalWeekMinutes = weeklyTotals.values().stream().mapToLong(Long::longValue).sum();
         chart.append("📈 Топ\\-3 задачи за неделю:\n");
 
@@ -1266,7 +1150,6 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             long minutes = task.getValue() % 60;
             double percentage = (task.getValue() * 100.0) / totalWeekMinutes;
 
-            // Markdown v2 fixing
             String taskName = task.getKey()
                     .replace("_", "\\_")
                     .replace("-", "\\-")
@@ -1279,30 +1162,22 @@ public class MyTelegramBot extends TelegramLongPollingBot {
                     .replace("[", "\\[")
                     .replace("]", "\\]");
 
-            // Markdown...
             String percentageStr = String.format("%.1f", percentage).replace(".", "\\.");
 
             chart.append(i + 1).append("\\. ")
                     .append(taskName)
                     .append(": ").append(hours).append("ч ").append(minutes).append("м \\(")
-                    .append(percentageStr)  // Используем уже экранированную строку
+                    .append(percentageStr)
                     .append("%\\)\n");
         }
 
         chart.append("\nВсего за неделю: ").append(totalWeekMinutes / 60)
                 .append("ч ").append(totalWeekMinutes % 60).append("м");
 
-// Sending message
-        String message = chart.toString();
-        SendMessage sendMessage = new SendMessage(chatId.toString(), message);
+        SendMessage sendMessage = new SendMessage(chatId.toString(), chart.toString());
         sendMessage.setParseMode("MarkdownV2");
 
-        try {
-            execute(sendMessage);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-
+        executeMessage(sendMessage); // CHANGED
     }
 
     private String getPeriodDescription(String periodType) {
@@ -1313,5 +1188,4 @@ public class MyTelegramBot extends TelegramLongPollingBot {
             default: return "период";
         }
     }
-
 }
